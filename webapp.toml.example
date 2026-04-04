@@ -1,0 +1,6 @@
+# copy to cameras.toml and edit
+# name is for display, host is IP or hostname
+
+[[camera]]
+name = "Kitchen"
+host = "kc100-kitchen.lan"

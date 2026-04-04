@@ -1,0 +1,85 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "This KC100 camera is already configured.",
+      "reauth_successful": "Credentials updated."
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the camera. Check the host address and that the camera is online.",
+      "invalid_auth": "Invalid username or password.",
+      "unknown": "Unexpected error."
+    },
+    "step": {
+      "reauth_confirm": {
+        "data": {
+          "password": "Password",
+          "username": "Username"
+        },
+        "description": "The credentials for {host} are no longer valid. Enter your Kasa cloud credentials again.",
+        "title": "Re-authenticate KC100"
+      },
+      "user": {
+        "data": {
+          "host": "Host",
+          "password": "Password",
+          "username": "Username"
+        },
+        "description": "Enter the hostname/IP and Kasa cloud credentials for your camera.",
+        "title": "Configure KC100 Camera"
+      }
+    }
+  },
+  "entity": {
+    "select": {
+      "motion_sensitivity": {
+        "name": "Motion Sensitivity"
+      },
+      "night_vision": {
+        "name": "Night Vision"
+      },
+      "power_frequency": {
+        "name": "Power Frequency"
+      },
+      "quality": {
+        "name": "Video Quality"
+      },
+      "resolution": {
+        "name": "Resolution"
+      },
+      "rotation": {
+        "name": "Image Rotation"
+      },
+      "sound_sensitivity": {
+        "name": "Sound Sensitivity"
+      }
+    },
+    "sensor": {
+      "cloud_status": {
+        "name": "Cloud Status"
+      },
+      "night_vision_sensor": {
+        "name": "Night Vision Mode"
+      },
+      "quality_sensor": {
+        "name": "Video Quality"
+      },
+      "resolution_sensor": {
+        "name": "Resolution"
+      }
+    },
+    "switch": {
+      "led": {
+        "name": "Status LED"
+      },
+      "motion_detect": {
+        "name": "Motion Detection"
+      },
+      "power": {
+        "name": "Camera Power"
+      },
+      "sound_detect": {
+        "name": "Sound Detection"
+      }
+    }
+  }
+}

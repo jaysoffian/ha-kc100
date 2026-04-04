@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+.DS_Store
+.claude/settings.local.json
+scratch/
+webapp.toml
+webapp/
+mise.local.toml

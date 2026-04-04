@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KC100 Dashboard</title>
+<style>
+:root {
+  --bg: #1a1d23;
+  --panel: #252933;
+  --panel-2: #2f3442;
+  --fg: #e6e8ed;
+  --muted: #8a93a6;
+  --accent: #4a9eff;
+  --ok: #4ade80;
+  --err: #f87171;
+  --border: #3a4050;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 14px;
+}
+header {
+  background: var(--panel); border-bottom: 1px solid var(--border);
+  padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+}
+header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+header select, header button {
+  background: var(--panel-2); color: var(--fg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 6px 10px; font-size: 13px; cursor: pointer;
+}
+header button:hover { background: var(--border); }
+.spacer { flex: 1; }
+.muted { color: var(--muted); font-size: 12px; }
+.loading { color: var(--accent); font-size: 13px; font-weight: 600; }
+.loading::after {
+  content: ""; display: inline-block; width: 10px; height: 10px;
+  border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%;
+  vertical-align: -1px; animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--panel); }
+.tab {
+  padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent;
+  color: var(--muted); font-weight: 500;
+}
+.tab.active { color: var(--fg); border-bottom-color: var(--accent); }
+main { padding: 16px; }
+.hidden { display: none !important; }
+
+/* Dashboard */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px 14px;
+}
+.card h3 { margin: 0 0 10px 0; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; gap: 10px; }
+.row label { flex: 1; font-size: 13px; }
+.row select, .row input[type=number] {
+  background: var(--panel-2); color: var(--fg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 4px 8px; font-size: 13px; min-width: 90px;
+}
+.row input[type=number] { width: 80px; min-width: 80px; }
+
+/* toggle switch */
+input[type=checkbox][data-kind="switch"] {
+  appearance: none; -webkit-appearance: none; margin: 0;
+  position: relative; width: 36px; height: 20px; flex-shrink: 0;
+  background: #3a3f4a; border-radius: 20px; cursor: pointer;
+  transition: background .15s;
+}
+input[type=checkbox][data-kind="switch"]::before {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; background: #e8e8e8; border-radius: 50%;
+  transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+input[type=checkbox][data-kind="switch"]:checked { background: var(--accent); }
+input[type=checkbox][data-kind="switch"]:checked::before { transform: translateX(16px); }
+input[type=checkbox][data-kind="switch"]:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.err-txt { color: var(--err); font-size: 11px; }
+pre { background: var(--panel-2); padding: 8px; border-radius: 4px; overflow: auto; font-size: 12px; margin: 0; }
+details summary { cursor: pointer; color: var(--muted); font-size: 12px; padding: 4px 0; }
+
+/* Toast */
+#toast {
+  position: fixed; bottom: 20px; right: 20px; padding: 10px 16px;
+  border-radius: 4px; font-size: 13px; opacity: 0; transition: opacity .2s;
+  pointer-events: none; z-index: 1000; max-width: 360px;
+}
+#toast.show { opacity: 1; }
+#toast.ok { background: var(--ok); color: #0a1f12; }
+#toast.err { background: var(--err); color: #2a0808; }
+
+/* Zones */
+.zones-layout { display: flex; gap: 16px; align-items: flex-start; }
+.canvas-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+#zone-canvas { display: block; background: #0a0c10; cursor: crosshair; border-radius: 4px; }
+.zones-side { flex: 1; min-width: 260px; max-width: 360px; }
+.zones-side .card { margin-bottom: 10px; }
+.zone-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 4px;
+  cursor: pointer; border: 1px solid transparent;
+}
+.zone-row:hover { background: var(--panel-2); }
+.zone-row.selected { background: var(--panel-2); border-color: var(--accent); }
+.swatch { width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0; border: 1px solid var(--border); }
+.zone-row .name { flex: 1; font-size: 13px; }
+.zone-row button {
+  background: transparent; color: var(--muted); border: 1px solid var(--border);
+  border-radius: 3px; padding: 2px 8px; font-size: 11px; cursor: pointer;
+}
+.zone-row button:hover { color: var(--err); border-color: var(--err); }
+.btn {
+  background: var(--accent); color: white; border: none; border-radius: 4px;
+  padding: 8px 14px; font-size: 13px; cursor: pointer; font-weight: 500;
+}
+.btn:hover { filter: brightness(1.1); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.secondary { background: var(--panel-2); color: var(--fg); border: 1px solid var(--border); }
+.status-line { font-family: "SF Mono", Menlo, monospace; font-size: 11px; color: var(--muted); margin-top: 6px; }
+input[type=file] { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>KC100</h1>
+  <select id="camera-select"></select>
+  <button id="refresh-btn">Reload</button>
+  <span class="muted" id="last-refresh">never</span>
+  <span class="spacer"></span>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="dashboard">Dashboard</div>
+  <div class="tab" data-tab="zones">Zones</div>
+</div>
+
+<main>
+
+<!-- Dashboard tab -->
+<div id="tab-dashboard" class="tab-panel">
+  <div class="grid">
+    <div class="card">
+      <h3>Power & LED</h3>
+      <div class="row" data-feature="power"><label>Power</label>
+        <input type="checkbox" data-kind="switch">
+      </div>
+      <div class="row" data-feature="led"><label>Status LED</label>
+        <input type="checkbox" data-kind="switch">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Motion</h3>
+      <div class="row" data-feature="motion.enabled"><label>Enabled</label>
+        <input type="checkbox" data-kind="switch">
+      </div>
+      <div class="row" data-feature="motion.sensitivity"><label>Sensitivity</label>
+        <select data-kind="select">
+          <option value="low">low</option><option value="medium">medium</option><option value="high">high</option>
+        </select>
+      </div>
+      <div class="row" data-feature="motion.sensitivity_level"><label>Level (day / night)</label>
+        <div style="display:flex;gap:4px">
+          <input type="number" min="0" max="10" step="1" data-kind="num-day" style="width:60px">
+          <input type="number" min="0" max="10" step="1" data-kind="num-night" style="width:60px">
+        </div>
+      </div>
+      <div class="row" data-feature="motion.min_trigger_time"><label>Min trigger ms (d/n)</label>
+        <div style="display:flex;gap:4px">
+          <input type="number" min="0" step="500" data-kind="num-day" style="width:70px">
+          <input type="number" min="0" step="500" data-kind="num-night" style="width:70px">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Sound</h3>
+      <div class="row" data-feature="sound.enabled"><label>Enabled</label>
+        <input type="checkbox" data-kind="switch">
+      </div>
+      <div class="row" data-feature="sound.sensitivity"><label>Sensitivity</label>
+        <select data-kind="select">
+          <option value="low">low</option><option value="medium">medium</option><option value="high">high</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Video</h3>
+      <div class="row" data-feature="resolution"><label>Resolution</label>
+        <select data-kind="select">
+          <option value="1080P">1080P</option><option value="720P">720P</option><option value="360P">360P</option>
+        </select>
+      </div>
+      <div class="row" data-feature="quality"><label>Quality</label>
+        <select data-kind="select">
+          <option value="low">low</option><option value="medium">medium</option><option value="high">high</option>
+        </select>
+      </div>
+      <div class="row" data-feature="rotation"><label>Rotation</label>
+        <select data-kind="select" data-type="int"><option value="0">0</option><option value="180">180</option></select>
+      </div>
+      <div class="row" data-feature="power_frequency"><label>Power freq</label>
+        <select data-kind="select" data-type="int"><option value="50">50</option><option value="60">60</option></select>
+      </div>
+      <div class="row" data-feature="night_vision"><label>Night vision</label>
+        <select data-kind="select">
+          <option value="auto">auto</option><option value="day">day</option><option value="night">night</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>OSD</h3>
+      <div class="row" data-feature="osd.logo"><label>Logo</label>
+        <input type="checkbox" data-kind="switch">
+      </div>
+      <div class="row" data-feature="osd.time"><label>Time</label>
+        <input type="checkbox" data-kind="switch">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Info</h3>
+      <div class="row"><label>Camera time</label><span id="info-time" class="muted">—</span></div>
+      <details><summary>Cloud info</summary><pre id="info-cloud">—</pre></details>
+    </div>
+  </div>
+</div>
+
+<!-- Zones tab -->
+<div id="tab-zones" class="tab-panel hidden">
+  <div class="zones-layout">
+    <div class="canvas-wrap">
+      <canvas id="zone-canvas" width="640" height="360"></canvas>
+      <div class="status-line" id="zone-status">cursor: —   vertices: —</div>
+    </div>
+    <div class="zones-side">
+      <div class="card">
+        <h3>Reference frame</h3>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <input type="file" id="snap-file" accept="image/jpeg,image/*">
+          <div style="display:flex;gap:6px">
+            <button class="btn secondary" id="snap-upload">Upload</button>
+            <button class="btn secondary" id="snap-remove">Remove</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Zones <span class="muted" id="zone-count">0/5</span></h3>
+        <div id="zone-list"></div>
+        <button class="btn secondary" id="add-zone" style="margin-top:8px;width:100%">Add Zone</button>
+      </div>
+      <div class="card">
+        <h3>Actions</h3>
+        <div style="display:flex;gap:6px">
+          <button class="btn" id="save-zones">Save to camera</button>
+          <button class="btn secondary" id="revert-zones">Revert</button>
+        </div>
+        <p class="muted" style="margin:8px 0 0 0">Drag vertices to reshape. Drag inside to move. Click a zone to select.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+// ---- State ----
+let currentHost = null;
+let cameras = [];
+let zones = [];          // [{x:[4], y:[4]}, ...] — 4-vertex polygons
+let maxZones = 5;
+let selectedZone = 0;
+let drag = null;         // {mode:"vertex"|"body", zone, idx?, dx?, dy?}
+let snapImage = null;
+const ZONE_COLORS = ["#ef4444","#22c55e","#3b82f6","#eab308","#d946ef"];
+const CW = 640, CH = 360;  // canvas size (16:9)
+const UMAX = 99;  // camera coords are 0..99 inclusive
+const SX = CW / UMAX, SY = CH / UMAX;  // unit → px scale
+
+// ---- URL helpers ----
+function getHostFromUrl() {
+  const p = new URLSearchParams(location.search);
+  return p.get("host");
+}
+function setHostInUrl(host) {
+  const p = new URLSearchParams(location.search);
+  p.set("host", host);
+  history.replaceState({}, "", location.pathname + "?" + p.toString());
+}
+
+// ---- Toast ----
+function toast(msg, kind) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "show " + (kind || "ok");
+  t.onclick = () => { t.className = ""; };
+  clearTimeout(toast._t);
+  const ms = kind === "err" ? 10000 : 2200;
+  toast._t = setTimeout(() => { t.className = ""; }, ms);
+}
+
+// ---- API ----
+async function apiGet(path) {
+  const r = await fetch(path);
+  if (!r.ok) {
+    let msg = "HTTP " + r.status;
+    try {
+      const body = await r.json();
+      if (body && body.error) msg = body.error;
+    } catch { /* non-json body */ }
+    throw new Error(msg);
+  }
+  return r.json();
+}
+async function apiSet(feature, args) {
+  const r = await fetch("/api/set", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({host: currentHost, feature, args}),
+  });
+  const data = await r.json();
+  if (!r.ok || data.error) throw new Error(data.error || data.detail || ("HTTP " + r.status));
+  return data;
+}
+
+// ---- Cameras / init ----
+async function loadCameras() {
+  cameras = await apiGet("/api/cameras");
+  const sel = document.getElementById("camera-select");
+  sel.innerHTML = "";
+  const fromUrl = getHostFromUrl();
+  if (cameras.length === 0) {
+    // no webapp.toml — rely on ?host=
+    if (fromUrl) {
+      const o = document.createElement("option");
+      o.value = fromUrl; o.textContent = fromUrl;
+      sel.appendChild(o);
+      currentHost = fromUrl;
+    } else {
+      const o = document.createElement("option");
+      o.value = ""; o.textContent = "(add ?host=HOST to URL)";
+      sel.appendChild(o);
+      sel.disabled = true;
+    }
+  } else {
+    for (const c of cameras) {
+      const o = document.createElement("option");
+      o.value = c.host; o.textContent = c.name + " (" + c.host + ")";
+      sel.appendChild(o);
+    }
+    currentHost = fromUrl && cameras.some(c => c.host === fromUrl) ? fromUrl : cameras[0].host;
+    sel.value = currentHost;
+  }
+  if (currentHost) setHostInUrl(currentHost);
+}
+
+// ---- Dashboard ----
+const SWITCH_FEATURES = ["power","led","motion.enabled","sound.enabled","osd.logo","osd.time"];
+
+let refreshing = false;
+async function refreshState() {
+  if (!currentHost || refreshing) return;
+  refreshing = true;
+  const lr = document.getElementById("last-refresh");
+  const btn = document.getElementById("refresh-btn");
+  lr.textContent = "";
+  lr.className = "loading";
+  btn.disabled = true;
+  let state;
+  try {
+    state = await apiGet("/api/state?host=" + encodeURIComponent(currentHost));
+  } catch (e) {
+    toast("failed to fetch state: " + e.message, "err");
+    lr.textContent = "load failed";
+    lr.className = "muted";
+    return;
+  } finally {
+    refreshing = false;
+    btn.disabled = false;
+  }
+  lr.textContent = "updated " + new Date().toLocaleTimeString();
+  lr.className = "muted";
+
+  for (const row of document.querySelectorAll("[data-feature]")) {
+    const feat = row.dataset.feature;
+    const val = state[feat];
+    applyToRow(row, val);
+  }
+  // info
+  const t = state["time"];
+  const ti = document.getElementById("info-time");
+  if (typeof t === "number") {
+    ti.textContent = new Date(t * 1000).toLocaleString() + " (" + t + ")";
+  } else {
+    ti.textContent = JSON.stringify(t);
+  }
+  document.getElementById("info-cloud").textContent = JSON.stringify(state["cloud_info"], null, 2);
+}
+
+function applyToRow(row, val) {
+  const feat = row.dataset.feature;
+  const isErr = val && typeof val === "object" && "error" in val;
+  const sw = row.querySelector('input[data-kind="switch"]');
+  const sel = row.querySelector('select[data-kind="select"]');
+  const nd = row.querySelector('[data-kind="num-day"]');
+  const nn = row.querySelector('[data-kind="num-night"]');
+  if (sw) {
+    sw.disabled = isErr;
+    if (!isErr) sw.checked = val === "on";
+  } else if (sel) {
+    sel.disabled = isErr;
+    if (!isErr) sel.value = String(val);
+  } else if (nd && nn) {
+    if (!isErr && Array.isArray(val)) {
+      nd.value = val[0]; nn.value = val[1];
+      nd.disabled = false; nn.disabled = false;
+    } else {
+      nd.disabled = true; nn.disabled = true;
+    }
+  }
+}
+
+function bindControls() {
+  for (const row of document.querySelectorAll("[data-feature]")) {
+    const feat = row.dataset.feature;
+    const sw = row.querySelector('input[data-kind="switch"]');
+    const sel = row.querySelector('select[data-kind="select"]');
+    const nd = row.querySelector('[data-kind="num-day"]');
+    const nn = row.querySelector('[data-kind="num-night"]');
+    if (sw) {
+      sw.addEventListener("change", async () => {
+        const v = sw.checked ? "on" : "off";
+        try { await apiSet(feat, [v]); toast(feat + " → " + v); }
+        catch(e) { toast(feat + ": " + e.message, "err"); }
+      });
+    } else if (sel) {
+      sel.addEventListener("change", async () => {
+        let v = sel.value;
+        if (sel.dataset.type === "int") v = parseInt(v, 10);
+        try { await apiSet(feat, [v]); toast(feat + " → " + v); }
+        catch(e) { toast(feat + ": " + e.message, "err"); }
+      });
+    } else if (nd && nn) {
+      const send = async () => {
+        const d = parseInt(nd.value, 10), n = parseInt(nn.value, 10);
+        try {
+          await apiSet(feat, [d, n]);
+          toast(feat + " → " + d + "/" + n);
+        } catch(e) { toast(feat + ": " + e.message, "err"); }
+      };
+      nd.addEventListener("change", send);
+      nn.addEventListener("change", send);
+    }
+  }
+}
+
+// ---- Tabs ----
+function bindTabs() {
+  for (const t of document.querySelectorAll(".tab")) {
+    t.addEventListener("click", () => {
+      for (const x of document.querySelectorAll(".tab")) x.classList.remove("active");
+      for (const x of document.querySelectorAll(".tab-panel")) x.classList.add("hidden");
+      t.classList.add("active");
+      document.getElementById("tab-" + t.dataset.tab).classList.remove("hidden");
+      if (t.dataset.tab === "zones") loadZones();
+    });
+  }
+}
+
+// ---- Zones ----
+const canvas = document.getElementById("zone-canvas");
+const ctx = canvas.getContext("2d");
+
+function drawZones() {
+  ctx.clearRect(0, 0, CW, CH);
+  // background
+  if (snapImage) {
+    ctx.globalAlpha = 0.6;
+    ctx.drawImage(snapImage, 0, 0, CW, CH);
+    ctx.globalAlpha = 1.0;
+  } else {
+    ctx.fillStyle = "#0a0c10";
+    ctx.fillRect(0, 0, CW, CH);
+  }
+  // grid
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= UMAX; i += 5) {
+    const px = i * SX + 0.5, py = i * SY + 0.5;
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, CH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(CW, py); ctx.stroke();
+  }
+  ctx.strokeStyle = "rgba(255,255,255,0.2)";
+  for (let i = 0; i <= UMAX; i += 10) {
+    const px = i * SX + 0.5, py = i * SY + 0.5;
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, CH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(CW, py); ctx.stroke();
+  }
+  // zones (4-vertex polygons)
+  for (let zi = 0; zi < zones.length; zi++) {
+    const z = zones[zi];
+    const color = ZONE_COLORS[zi % ZONE_COLORS.length];
+    ctx.beginPath();
+    ctx.moveTo(z.x[0] * SX, z.y[0] * SY);
+    for (let i = 1; i < 4; i++) ctx.lineTo(z.x[i] * SX, z.y[i] * SY);
+    ctx.closePath();
+    ctx.fillStyle = color + "40";
+    ctx.fill();
+    ctx.strokeStyle = zi === selectedZone ? color : color + "80";
+    ctx.lineWidth = zi === selectedZone ? 2 : 1;
+    ctx.stroke();
+    // vertex handles (only for selected)
+    if (zi === selectedZone) {
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.arc(z.x[i] * SX, z.y[i] * SY, 6, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = "white"; ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+function polyContains(z, ux, uy) {
+  // ray-cast point-in-polygon
+  let inside = false;
+  for (let i = 0, j = 3; i < 4; j = i++) {
+    const xi = z.x[i], yi = z.y[i], xj = z.x[j], yj = z.y[j];
+    if (((yi > uy) !== (yj > uy)) && (ux < (xj - xi) * (uy - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function renderZoneList() {
+  const list = document.getElementById("zone-list");
+  list.innerHTML = "";
+  for (let i = 0; i < zones.length; i++) {
+    const row = document.createElement("div");
+    row.className = "zone-row" + (i === selectedZone ? " selected" : "");
+    row.innerHTML =
+      '<div class="swatch" style="background:' + ZONE_COLORS[i % ZONE_COLORS.length] + '"></div>' +
+      '<span class="name">Zone ' + (i+1) + '</span>' +
+      '<button data-idx="' + i + '">×</button>';
+    row.addEventListener("click", (e) => {
+      if (e.target.tagName === "BUTTON") return;
+      selectedZone = i; renderZoneList(); drawZones();
+    });
+    row.querySelector("button").addEventListener("click", (e) => {
+      e.stopPropagation();
+      zones.splice(i, 1);
+      if (selectedZone >= zones.length) selectedZone = Math.max(0, zones.length - 1);
+      renderZoneList(); drawZones();
+    });
+    list.appendChild(row);
+  }
+  document.getElementById("zone-count").textContent = zones.length + "/" + maxZones;
+  document.getElementById("add-zone").disabled = zones.length >= maxZones;
+}
+
+function canvasToUnit(evt) {
+  const r = canvas.getBoundingClientRect();
+  const x = (evt.clientX - r.left) * (CW / r.width) / SX;
+  const y = (evt.clientY - r.top) * (CH / r.height) / SY;
+  return {x: Math.max(0, Math.min(UMAX, Math.round(x))),
+          y: Math.max(0, Math.min(UMAX, Math.round(y))),
+          fx: Math.max(0, Math.min(UMAX, x)),
+          fy: Math.max(0, Math.min(UMAX, y))};
+}
+
+function hitVertex(ux, uy) {
+  const z = zones[selectedZone];
+  if (!z) return null;
+  for (let i = 0; i < 4; i++) {
+    const dx = z.x[i] - ux, dy = z.y[i] - uy;
+    if (dx*dx + dy*dy <= 36) return i;  // 6-unit radius
+  }
+  return null;
+}
+
+canvas.addEventListener("mousedown", (e) => {
+  if (e.button !== 0) return;
+  const u = canvasToUnit(e);
+  // 1. vertex handle on selected zone?
+  const vi = hitVertex(u.x, u.y);
+  if (vi !== null) {
+    drag = {mode: "vertex", zone: selectedZone, idx: vi};
+    e.preventDefault(); return;
+  }
+  // 2. click inside any polygon → select + drag body
+  for (let i = zones.length - 1; i >= 0; i--) {
+    if (polyContains(zones[i], u.fx, u.fy)) {
+      selectedZone = i;
+      drag = {mode: "body", zone: i, lastX: u.fx, lastY: u.fy};
+      renderZoneList(); drawZones();
+      e.preventDefault(); return;
+    }
+  }
+});
+canvas.addEventListener("mousemove", (e) => {
+  const u = canvasToUnit(e);
+  document.getElementById("zone-status").textContent = "cursor: (" + u.x + "," + u.y + ")";
+  if (!drag) return;
+  const z = zones[drag.zone];
+  if (drag.mode === "vertex") {
+    z.x[drag.idx] = u.x; z.y[drag.idx] = u.y;
+  } else if (drag.mode === "body") {
+    let ddx = u.fx - drag.lastX, ddy = u.fy - drag.lastY;
+    // clamp so all vertices stay in 0..UMAX
+    const minX = Math.min(...z.x), maxX = Math.max(...z.x);
+    const minY = Math.min(...z.y), maxY = Math.max(...z.y);
+    ddx = Math.max(-minX, Math.min(UMAX - maxX, ddx));
+    ddy = Math.max(-minY, Math.min(UMAX - maxY, ddy));
+    for (let i = 0; i < 4; i++) {
+      z.x[i] = Math.round(z.x[i] + ddx);
+      z.y[i] = Math.round(z.y[i] + ddy);
+    }
+    drag.lastX = u.fx; drag.lastY = u.fy;
+  }
+  drawZones();
+});
+window.addEventListener("mouseup", () => { drag = null; });
+
+document.getElementById("add-zone").addEventListener("click", () => {
+  if (zones.length >= maxZones) return;
+  zones.push({x: [0, UMAX, UMAX, 0], y: [0, 0, UMAX, UMAX]});
+  selectedZone = zones.length - 1;
+  renderZoneList(); drawZones();
+});
+document.getElementById("save-zones").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = "saving…";
+  try {
+    const r = await fetch("/api/zones?host=" + encodeURIComponent(currentHost), {
+      method: "PUT", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({area: zones}),
+    });
+    const d = await r.json();
+    if (!r.ok || d.error) {
+      const msg = (d.detail && typeof d.detail === "object") ? (d.detail.error || JSON.stringify(d.detail)) : (d.error || d.detail || r.status);
+      throw new Error(msg);
+    }
+    toast("zones saved");
+  } catch(e) { toast("save failed: " + e.message, "err"); }
+  finally { btn.disabled = false; btn.textContent = orig; }
+});
+document.getElementById("revert-zones").addEventListener("click", loadZones);
+
+async function loadZones() {
+  if (!currentHost) return;
+  const status = document.getElementById("zone-status");
+  status.textContent = "";
+  status.className = "loading";
+  try {
+    const d = await apiGet("/api/zones?host=" + encodeURIComponent(currentHost));
+    maxZones = d.max || 5;
+    zones = (d.area || []).map(z => ({...z, x: z.x.slice(), y: z.y.slice()}));
+    selectedZone = zones.length > 0 ? 0 : 0;
+  } catch(e) {
+    status.textContent = "load failed";
+    status.className = "status-line";
+    toast("load zones: " + e.message, "err");
+    return;
+  }
+  await loadSnapshot();
+  renderZoneList(); drawZones();
+  status.textContent = "cursor: —   vertices: " + zones.length * 4;
+  status.className = "status-line";
+}
+
+async function loadSnapshot() {
+  snapImage = null;
+  try {
+    const r = await fetch("/api/snapshot?host=" + encodeURIComponent(currentHost));
+    if (!r.ok) return;
+    const blob = await r.blob();
+    const img = new Image();
+    img.src = URL.createObjectURL(blob);
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+    snapImage = img;
+  } catch(e) { /* ignore */ }
+}
+
+document.getElementById("snap-upload").addEventListener("click", async () => {
+  const f = document.getElementById("snap-file").files[0];
+  if (!f) { toast("pick a file first", "err"); return; }
+  const fd = new FormData(); fd.append("file", f);
+  try {
+    const r = await fetch("/api/snapshot?host=" + encodeURIComponent(currentHost), { method: "POST", body: fd });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    await loadSnapshot(); drawZones();
+    toast("snapshot uploaded");
+  } catch(e) { toast("upload failed: " + e.message, "err"); }
+});
+document.getElementById("snap-remove").addEventListener("click", async () => {
+  try {
+    await fetch("/api/snapshot?host=" + encodeURIComponent(currentHost), { method: "DELETE" });
+    snapImage = null; drawZones();
+    toast("snapshot removed");
+  } catch(e) { toast("remove failed: " + e.message, "err"); }
+});
+
+// ---- Wire up ----
+document.getElementById("camera-select").addEventListener("change", (e) => {
+  currentHost = e.target.value;
+  setHostInUrl(currentHost);
+  refreshState();
+  if (!document.getElementById("tab-zones").classList.contains("hidden")) loadZones();
+});
+document.getElementById("refresh-btn").addEventListener("click", refreshState);
+
+async function main() {
+  bindTabs();
+  bindControls();
+  await loadCameras();
+  if (currentHost) {
+    await refreshState();
+  }
+  drawZones();
+}
+main();
+</script>
+</body>
+</html>
